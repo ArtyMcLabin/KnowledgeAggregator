@@ -76,4 +76,7 @@ profiles/
 .env
 auth/
 projectsSources/
-WRAPPERS/ 
+
+# Ignore the contents of the WRAPPERS directory, but not the directory itself
+WRAPPERS/*
+!WRAPPERS/.gitkeep 
