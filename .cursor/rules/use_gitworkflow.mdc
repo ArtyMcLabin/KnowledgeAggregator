@@ -1,0 +1,26 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# GitWorkflow
+
+This project uses the GitWorkflow system as defined in https://github.com/ArtyMcLabin/GitWorkflow/README.md.
+
+## Branch Structure
+
+- `main` - The primary branch that contains production-ready code
+- `develop` - The development branch where features are integrated
+- `feature/*` - Feature branches for new functionality
+- `fix/*` - Branches for bug fixes
+- `hotfix/*` - Critical fixes that need to be applied directly to main
+
+## Workflow Rules
+
+1. Always create feature branches from `develop`
+2. Use descriptive branch names with prefixes (`feature/`, `fix/`, `hotfix/`)
+3. Rebase feature branches before merging to maintain a clean history
+4. Use `--no-ff` when merging to preserve feature branch history
+5. Delete branches after they are merged
+
+Follow all GitWorkflow procedures for this repository.

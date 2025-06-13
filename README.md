@@ -1,6 +1,73 @@
 # Knowledge Aggregator
 
-A Python script that aggregates knowledge from various sources for use with LLMs. This script fetches data from Trello, Google Sheets, Supabase databases, and local Git repositories based on project-specific profiles.
+A tool for aggregating and processing knowledge from various sources into a unified knowledge base.
+
+## Overview
+
+Knowledge Aggregator is a Python-based tool designed to collect information from various sources such as:
+
+- Trello boards
+- Google Sheets
+- Supabase databases
+- Git repositories
+
+The collected information is processed and stored in a structured format, making it easier to analyze and utilize the knowledge across different projects.
+
+## Features
+
+- Connect to and retrieve data from Trello boards
+- Export and process Google Sheets data
+- Extract schema information from Supabase databases
+- Process Git repositories using repomix
+- Create a unified knowledge base from multiple sources
+- Customizable output formats and directories
+
+## Installation
+
+1. Clone this repository
+2. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+3. Copy `env.example` to `.env` and fill in your API credentials
+
+## Usage
+
+Run the knowledge aggregator with a profile:
+
+```bash
+python knowledge_aggregator.py --profile projectsSources/your_profile.json
+```
+
+### Profile Configuration
+
+Create a JSON profile with your data sources:
+
+```json
+{
+  "name": "Project Name",
+  "output_dir": "knowledge_base_output/Project_Name",
+  "trello": {
+    "boards": [
+      {"id": "board_id"}
+    ]
+  },
+  "google_sheets": [
+    {"id": "sheet_id"}
+  ],
+  "supabase": {
+    "url": "your_supabase_url",
+    "key": "your_supabase_key"
+  },
+  "repositories": [
+    {"path": "path/to/local/repo"}
+  ]
+}
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Setup
 
@@ -36,21 +103,6 @@ A Python script that aggregates knowledge from various sources for use with LLMs
     *   Use `projectsSources/wa_assistant.json` as a template.
     *   Define all the data sources for your project in this file.
     *   **Database Credentials**: For simplicity and project portability, database credentials (`host`, `user`, `password`, etc.) are stored directly in the project's JSON profile.
-
-## Usage
-
-Run the script from your terminal, specifying which profile you want to use:
-
-```bash
-python knowledge_aggregator.py --profile projectsSources/wa_assistant.json
-```
-
-*   You can create multiple profiles for different projects.
-*   The output files will be saved in a subdirectory named after your project inside the `knowledge_base_output` folder.
-
-### Optional Arguments
-
-*   `-o, --output`: Specify a different main output directory (default: `knowledge_base_output`).
 
 ## Output
 
