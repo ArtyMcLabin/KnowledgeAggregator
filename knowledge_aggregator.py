@@ -19,6 +19,9 @@ from dotenv import load_dotenv
 import psycopg2
 import psycopg2.extras
 from supabase import create_client, Client
+import tempfile
+import shutil
+from github import Github, GithubException
 
 # --- CONFIGURATION & CONSTANTS ---
 
@@ -243,6 +246,75 @@ def fetch_google_sheet(sheet_id, creds, output_dir):
     except HttpError as e:
         print_error(f"An error occurred with Google API for sheet {sheet_id}: {e}. Check Sheet ID and sharing settings.")
 
+def fetch_github_issues(repo_name, output_dir):
+    """Fetches a GitHub repository's issues using the gh CLI."""
+    print_status(f"Fetching GitHub issues for {repo_name}...")
+    output_filename = os.path.join(output_dir, f"repo_{repo_name.replace('/', '_')}_issues.json")
+    command = [
+        'gh', 'issue', 'list',
+        '-R', repo_name,
+        '--json', 'title,body,state,createdAt,updatedAt,author,comments,labels,number,url',
+        '--limit', '500' # Adjust limit as needed
+    ]
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', shell=True)
+        issues = json.loads(result.stdout)
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(issues, f, ensure_ascii=False, indent=4)
+        print_success(f"GitHub issues for '{repo_name}' saved to {output_filename}")
+        return True
+    except FileNotFoundError:
+        print_error("`gh` command not found. Please install the GitHub CLI: https://cli.github.com/")
+        return False
+    except subprocess.CalledProcessError as e:
+        print_error(f"GitHub CLI failed while fetching issues for '{repo_name}':\n{e.stderr}")
+        return False
+    except json.JSONDecodeError:
+        print_error(f"Failed to parse JSON from GitHub CLI output for issues of '{repo_name}'.")
+        return False
+
+def fetch_github_prs(repo_name, output_dir):
+    """Fetches a GitHub repository's pull requests using the gh CLI."""
+    print_status(f"Fetching GitHub PRs for {repo_name}...")
+    output_filename = os.path.join(output_dir, f"repo_{repo_name.replace('/', '_')}_prs.json")
+    command = [
+        'gh', 'pr', 'list',
+        '-R', repo_name,
+        '--json', 'title,body,state,createdAt,updatedAt,author,comments,labels,number,url,reviews',
+        '--limit', '500' # Adjust limit as needed
+    ]
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', shell=True)
+        prs = json.loads(result.stdout)
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(prs, f, ensure_ascii=False, indent=4)
+        print_success(f"GitHub PRs for '{repo_name}' saved to {output_filename}")
+        return True
+    except FileNotFoundError:
+        print_error("`gh` command not found. Please install the GitHub CLI: https://cli.github.com/")
+        return False
+    except subprocess.CalledProcessError as e:
+        print_error(f"GitHub CLI failed while fetching PRs for '{repo_name}':\n{e.stderr}")
+        return False
+    except json.JSONDecodeError:
+        print_error(f"Failed to parse JSON from GitHub CLI output for PRs of '{repo_name}'.")
+        return False
+
+def clone_github_repo(repo_url, temp_dir):
+    """Clones a GitHub repository into a temporary directory."""
+    print_status(f"Cloning GitHub repository: {repo_url}...")
+    command = ['gh', 'repo', 'clone', repo_url, temp_dir]
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', shell=True)
+        print_success(f"Successfully cloned {repo_url} to {temp_dir}")
+        return True
+    except FileNotFoundError:
+        print_error("`gh` command not found. Please install the GitHub CLI: https://cli.github.com/")
+        return False
+    except subprocess.CalledProcessError as e:
+        print_error(f"GitHub CLI failed while cloning '{repo_url}':\n{e.stderr}")
+        return False
+
 def dump_supabase_schema(db_config, output_dir):
     """Extracts the Supabase database schema using the Supabase REST API."""
     print_status("Extracting Supabase DB schema...")
@@ -354,37 +426,38 @@ def dump_supabase_schema(db_config, output_dir):
     except Exception as e:
         print_error(f"Failed to extract Supabase schema: {e}")
 
+def load_profile(profile_path):
+    """Loads a JSON profile file."""
+    if not profile_path:
+        print_error("No profile specified. Use the --profile argument to provide the path to a JSON profile file.")
+    try:
+        with open(profile_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print_error(f"Profile file not found: {profile_path}")
+    except json.JSONDecodeError:
+        print_error(f"Invalid JSON in profile file: {profile_path}")
+
 # --- MAIN EXECUTION ---
 
 def main():
-    """Main function to parse arguments and run the aggregation tasks."""
-    parser = argparse.ArgumentParser(description="Aggregate knowledge from various sources for an LLM based on a project profile.")
-    parser.add_argument(
-        '--profile',
-        required=True,
-        help='Path to the project profile JSON file (e.g., projectsSources/my_project.json)'
-    )
-    parser.add_argument(
-        '-o', '--output',
-        default='knowledge_base_output',
-        help='Directory to save the output files (default: knowledge_base_output)'
-    )
+    """Main function to run the knowledge aggregator."""
+    parser = argparse.ArgumentParser(description="Knowledge Aggregator for LLMs")
+    parser.add_argument('--profile', type=str, required=True, help='Path to the project profile JSON file.')
     args = parser.parse_args()
 
-    # Load profile
-    if not os.path.exists(args.profile):
-        print_error(f"Profile file not found at '{args.profile}'.")
-    
-    with open(args.profile, 'r') as f:
-        profile = json.load(f)
+    # Load the specified profile
+    profile = load_profile(args.profile)
+    project_name = profile.get('name', 'default_project')
+    output_dir = profile.get('output_dir', os.path.join('knowledge_base_output', project_name))
 
-    project_name = profile.get("project_name", "default_project")
-    output_dir = os.path.join(args.output, project_name)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
+    # --- SCRIPT EXECUTION ---
     start_time = datetime.now()
     print_status(f"Starting knowledge aggregation for project '{project_name}' at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Create output directory if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # Process all data sources
     sources = profile.get("data_sources", {})
@@ -398,24 +471,69 @@ def main():
     for trello_board in sources.get("trello", []):
         fetch_trello_data(trello_board["board_id"], output_dir)
 
-    if google_creds:
-        for sheet in sources.get("google_sheets", []):
-            fetch_google_sheet(sheet["sheet_id"], google_creds, output_dir)
+    if 'google_sheets' in profile:
+        for sheet in profile['google_sheets']:
+            fetch_google_sheet(sheet['id'], google_creds, output_dir)
     
-    for db_config in sources.get("supabase_db", []):
-        dump_supabase_schema(db_config, output_dir)
+    if 'supabase' in profile:
+        dump_supabase_schema(profile['supabase'], output_dir)
 
-    failures = 0
-    for repo in sources.get("repositories", []):
-        success = process_repository_with_repomix(os.path.expanduser(repo["path"]), output_dir)
-        if not success:
-            failures += 1
+    # Process local repositories
+    if 'repositories' in profile:
+        for repo in profile['repositories']:
+            process_repository_with_repomix(repo['path'], output_dir)
     
+    # Process GitHub repositories
+    if 'github_repositories' in profile:
+        for repo_info in profile['github_repositories']:
+            repo_url = repo_info.get('url')
+            if not repo_url:
+                continue
+
+            # Extract owner/repo from URL for API calls
+            try:
+                repo_name = '/'.join(repo_url.split('/')[-2:]).replace('.git', '')
+            except IndexError:
+                print_error(f"Could not parse repository name from URL: {repo_url}")
+                continue
+
+            # Create a dedicated temp folder for the clone
+            temp_base_path = os.path.join('temp', repo_name.replace('/', '_'))
+            
+            try:
+                # 1. Clone repo and process with repomix
+                if clone_github_repo(repo_url, temp_base_path):
+                    process_repository_with_repomix(temp_base_path, output_dir)
+
+                # 2. Fetch issues if requested
+                if repo_info.get('fetch_issues'):
+                    fetch_github_issues(repo_name, output_dir)
+                
+                # 3. Fetch PRs if requested
+                if repo_info.get('fetch_prs'):
+                    fetch_github_prs(repo_name, output_dir)
+            finally:
+                # Ensure the temporary directory is always removed
+                if os.path.isdir(temp_base_path):
+                    print_status(f"Cleaning up temporary directory: {temp_base_path}")
+                    shutil.rmtree(temp_base_path)
+
+    # --- FINAL MESSAGE ---
     end_time = datetime.now()
-    if failures > 0:
-        print_status(f"Completed with {failures} repository processing failures.")
-    print_success(f"All tasks for project '{project_name}' completed in {end_time - start_time}.")
-    print_success(f"Your consolidated knowledge base is ready in the '{output_dir}' directory.")
+    duration = end_time - start_time
+    print_success(f"All tasks for project '{project_name}' completed in {duration}.")
+    
+    # Open the output directory for the user
+    try:
+        print_success(f"Your consolidated knowledge base is ready. Opening output directory: {output_dir}")
+        if sys.platform == "win32":
+            os.startfile(os.path.realpath(output_dir))
+        elif sys.platform == "darwin":
+            subprocess.run(["open", os.path.realpath(output_dir)])
+        else:
+            subprocess.run(["xdg-open", os.path.realpath(output_dir)])
+    except Exception as e:
+        print_error(f"Could not open output directory '{output_dir}'. Please open it manually. Error: {e}")
 
 
 if __name__ == '__main__':

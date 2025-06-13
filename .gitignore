@@ -79,4 +79,8 @@ projectsSources/
 
 # Ignore the contents of the WRAPPERS directory, but not the directory itself
 WRAPPERS/*
-!WRAPPERS/.gitkeep 
+!WRAPPERS/.gitkeep
+
+# Ignore the contents of the temp directory
+temp/*
+!temp/.gitkeep 
