@@ -94,11 +94,18 @@ python knowledge_aggregator.py --profile projectsSources/my_startup.json
 
 ### Tip: Create a Wrapper Script
 
-For convenience, create a wrapper script (e.g., `run_my_startup.bat`) to run a profile's aggregation with one click.
+For convenience, create a wrapper script (e.g., `run_my_startup.bat`) inside the `WRAPPERS/` directory to run a profile's aggregation with one click. This directory is ignored by Git, so your personal scripts won't be committed.
+
+**Example (`WRAPPERS/run_my_startup.bat` on Windows):**
+```bat
+@echo off
+python ../knowledge_aggregator.py --profile ../projectsSources/my_startup.json
+pause
+```
 
 ## Security Notes
 
-- The `.gitignore` file is configured to exclude sensitive files like `.env`, the `auth/` directory, and the `projectsSources/` directory. **Do not commit them.**
+- The `.gitignore` file is configured to exclude sensitive files like `.env`, the `auth/` directory, `projectsSources/` and `WRAPPERS/`. **Do not commit them.**
 - Keep personal API keys in your local `.env` file. Project-specific details are stored in the JSON profiles.
 
 ## License
