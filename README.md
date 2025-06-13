@@ -1,4 +1,4 @@
-# v1.0 Knowledge Aggregator
+# v1.1 Knowledge Aggregator
 
 This tool is designed to be set up and used by a Large Language Model (LLM) assistant like the one in Cursor. Point your LLM to this README file and instruct it to follow the setup steps.
 
@@ -96,10 +96,17 @@ python knowledge_aggregator.py --profile projectsSources/my_startup.json
 
 For convenience, create a wrapper script (e.g., `run_my_startup.bat`) inside the `WRAPPERS/` directory to run a profile's aggregation with one click. This directory is ignored by Git, so your personal scripts won't be committed.
 
-**Example (`WRAPPERS/run_my_startup.bat` on Windows):**
+The script needs to first change to the root directory of the project to ensure all paths work correctly.
+
+**Template for `run_my_startup.bat` on Windows:**
 ```bat
 @echo off
-python ../knowledge_aggregator.py --profile ../projectsSources/my_startup.json
+rem Change directory to the script's parent directory (the project root)
+cd /d "%~dp0..\\"
+
+rem Run the script with the desired profile
+python knowledge_aggregator.py --profile projectsSources/my_startup.json
+
 pause
 ```
 
