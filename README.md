@@ -131,7 +131,7 @@ def main():
     """
     try:
         # --- !! IMPORTANT: SET YOUR PROFILE NAME HERE !! ---
-        PROFILE_NAME = "my_startup.json"
+        PROFILE_NAME = "my_awesome_project.json"
         # ----------------------------------------------------
 
         # Get the directory of the current script to build the correct path to the main script
@@ -193,22 +193,21 @@ This is the recommended approach. It keeps project-specific rules within the pro
 **How to do it:**
 1.  Create a file named `.repomixignore` in the root of the project you want to analyze (e.g., in your `my-awesome-project` repository).
 2.  Add the paths to files and directories you want to exclude, one per line. Use the same syntax as a `.gitignore` file.
-3.  I have created a ` ` file in this project with recommended defaults for a a generic web project site. You can use it as a starting point.
 
-**Example `.repomixignore` for a a generic web project Project:**
+**Example `.repomixignore` for a generic web project:**
 ```
-# a generic web project core and plugin directories
+# Node.js dependencies
 node_modules/
+
+# Build output
 dist/
 build/
 
-
-# Large vendor libraries
-
-
-# Common log and package files
+# Log files
 *.log
 
+# Environment variables
+.env
 ```
 
 ## Security Notes
