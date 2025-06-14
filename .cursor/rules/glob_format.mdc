@@ -1,0 +1,14 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Glob Format Convention
+
+Use a single-line format for defining globs. The format should not include quotes around the glob patterns.
+
+**Format:**
+`globs: <pattern1>, <pattern2>, ...`
+
+**Example:**
+`globs: src/**/*.ts, tests/**/*.ts`
