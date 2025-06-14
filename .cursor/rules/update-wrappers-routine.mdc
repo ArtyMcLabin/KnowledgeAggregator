@@ -1,0 +1,18 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Routine: Update Aggregator Wrappers
+
+This is a manual routine for updating the Python wrapper scripts used to run knowledge aggregation profiles.
+
+**When to use:**
+Trigger this routine when you need to change the standard logic for how profiles are executed (e.g., changing how errors are handled, adding new logging, etc.).
+
+**Steps:**
+1.  **Update Template in README:** Modify the Python wrapper template located in the `README.md` under the "Tip: Create a Python Wrapper Script" section.
+    - Reference: `[README.md](mdc:README.md)`
+2.  **Update Existing Wrappers:** Go to the `WRAPPERS/` directory and manually update all existing `*.py` wrapper scripts to reflect the changes made to the template.
+    - Reference: `[WRAPPERS/](mdc:WRAPPERS/)`
+3.  **Verify:** Run one of the updated wrappers to ensure the new logic works as expected.
