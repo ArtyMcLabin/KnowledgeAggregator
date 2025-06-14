@@ -1,4 +1,4 @@
-# v1.2 Knowledge Aggregator
+# v1.3 Knowledge Aggregator
 
 This tool is designed to be set up and used by a Large Language Model (LLM) assistant like the one in Cursor. Point your LLM to this README file and instruct it to follow the setup steps.
 
