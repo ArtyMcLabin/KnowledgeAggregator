@@ -1,3 +1,4 @@
+# v1.2 - Added repomix --compress and --remote support
 import os
 import json
 import configparser
@@ -196,58 +197,103 @@ def remove_readonly(func, path, _):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
-def process_repository_with_repomix(repo_path, output_dir, date_prefix):
-    """Processes a repository using the repomix CLI tool."""
-    repo_name = os.path.basename(os.path.normpath(repo_path))
-    print_status(f"Processing repository with repomix: {repo_name}...")
+def process_repository_with_repomix(repo_path_or_url, output_dir, date_prefix, compress=False, remote=False, ignore_patterns=None):
+    """Processes a repository using the repomix CLI tool with optional compression and remote support."""
+    if remote:
+        # For remote repositories, extract repo name from URL
+        repo_name = repo_path_or_url.split('/')[-1].replace('.git', '')
+        if '/' in repo_path_or_url.split('/')[-2:][0]:
+            repo_name = '_'.join(repo_path_or_url.split('/')[-2:]).replace('.git', '')
+        print_status(f"Processing remote repository with repomix: {repo_path_or_url}...")
+    else:
+        # For local repositories
+        repo_name = os.path.basename(os.path.normpath(repo_path_or_url))
+        print_status(f"Processing local repository with repomix: {repo_name}...")
+        
+        if not os.path.isdir(repo_path_or_url):
+            print_error(f"Repository path not found: {repo_path_or_url}")
+            return False
 
-    if not os.path.isdir(repo_path):
-        print_error(f"Repository path not found: {repo_path}")
-        return False
-
+    # repomix --compress doesn't create a .gz file, it just makes the text output smaller.
     output_filename = os.path.join(output_dir, f"{date_prefix}_repo_{repo_name}_repomix.txt")
     
-    # --- Build repomix command with ignore patterns ---
+    # --- Build repomix command ---
     command = [
         'npx', 'repomix',
         '--style', 'plain',
         '-o', output_filename
     ]
     
-    # Prioritize .repomixignore from the target repo, but fall back to local one
-    ignore_file_path = os.path.join(repo_path, '.repomixignore')
-    if not os.path.exists(ignore_file_path):
-        print_status("No .repomixignore found in target repo, using local fallback.")
-        ignore_file_path = '.repomixignore' # Use local file
-
-    if os.path.exists(ignore_file_path):
-        print_status(f"Applying ignore patterns from {os.path.abspath(ignore_file_path)}.")
-        with open(ignore_file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                pattern = line.strip()
-                if pattern and not pattern.startswith('#'):
-                    command.extend(['--ignore', pattern])
+    # Add compression flag if requested
+    if compress:
+        command.append('--compress')
+        print_status("Compression enabled for repomix output")
     
-    command.append(repo_path)
+    # Add remote flag if processing remote repository
+    if remote:
+        command.append('--remote')
+        command.append(repo_path_or_url)
+        print_status(f"Using repomix --remote for {repo_path_or_url}")
+    else:
+        # For local repositories, handle ignore patterns
+        if ignore_patterns:
+            print_status(f"Applying {len(ignore_patterns)} custom ignore patterns")
+            for pattern in ignore_patterns:
+                if pattern.strip() and not pattern.strip().startswith('#'):
+                    command.extend(['--ignore', pattern.strip()])
+        else:
+            # Prioritize .repomixignore from the target repo, but fall back to local one
+            ignore_file_path = os.path.join(repo_path_or_url, '.repomixignore')
+            if not os.path.exists(ignore_file_path):
+                print_status("No .repomixignore found in target repo, using local fallback.")
+                ignore_file_path = '.repomixignore' # Use local file
+
+            if os.path.exists(ignore_file_path):
+                print_status(f"Applying ignore patterns from {os.path.abspath(ignore_file_path)}.")
+                with open(ignore_file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        pattern = line.strip()
+                        if pattern and not pattern.startswith('#'):
+                            command.extend(['--ignore', pattern])
+        
+        command.append(repo_path_or_url)
     
     try:
         # Re-adding shell=True as it's needed for npx.cmd on Windows.
-        # Passing command as a list, which is generally safer.
         result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', shell=True)
-        print_success(f"Repository '{repo_name}' processed by repomix into {output_filename}")
+        
+        # Check if output file was created and get its size
+        if os.path.exists(output_filename):
+            file_size = os.path.getsize(output_filename)
+            size_mb = file_size / (1024 * 1024)
+            print_success(f"Repository '{repo_name}' processed by repomix into {output_filename} ({size_mb:.2f} MB)")
+        else:
+            print_success(f"Repository '{repo_name}' processed by repomix into {output_filename}")
+            
         if result.stdout:
-            print_status(f"Repomix output:\n{result.stdout}")
+            print_status("Repomix output:")
+            # Print stdout directly to preserve formatting without adding extra newlines
+            print(result.stdout.strip())
         return True
+        
     except FileNotFoundError:
         print_error(f"`npx` command not found. Is Node.js installed and in your PATH?")
-        print_status(f"Falling back to directory listing for repository: {repo_name}")
-        return list_directory_structure(repo_path, output_dir, date_prefix)
+        if not remote:  # Only fallback for local repos
+            print_status(f"Falling back to directory listing for repository: {repo_name}")
+            return list_directory_structure(repo_path_or_url, output_dir, date_prefix)
+        return False
+        
     except subprocess.CalledProcessError as e:
-        print_error(f"Repomix failed for '{repo_name}' with exit code {e.returncode}:\n{e.stderr}")
-        print_status(f"Falling back to directory listing for repository: {repo_name}")
-        success = list_directory_structure(repo_path, output_dir, date_prefix)
-        if not success:
-            print_error("Fallback directory listing also failed.")
+        error_message = f"Repomix failed for '{repo_name}' with exit code {e.returncode}."
+        # Ensure stderr is captured and decoded correctly
+        stderr_output = e.stderr.strip() if e.stderr else "No stderr output."
+        print_error(f"{error_message}\n--- Start of Repomix Error ---\n{stderr_output}\n--- End of Repomix Error ---")
+
+        if not remote:  # Only fallback for local repos
+            print_status(f"Falling back to directory listing for repository: {repo_name}")
+            success = list_directory_structure(repo_path_or_url, output_dir, date_prefix)
+            if not success:
+                print_error("Fallback directory listing also failed.")
         return False
 
 def fetch_google_sheet(sheet_id, creds, output_dir, date_prefix):
@@ -522,9 +568,19 @@ def main():
     # Process local repositories
     if 'repositories' in profile:
         for repo in profile['repositories']:
-            process_repository_with_repomix(repo.get('path'), output_dir, date_prefix)
+            # Extract compression and ignore patterns from repo config
+            compress = repo.get('compress', False)
+            ignore_patterns = repo.get('ignore_patterns', None)
+            process_repository_with_repomix(
+                repo.get('path'), 
+                output_dir, 
+                date_prefix, 
+                compress=compress, 
+                remote=False, 
+                ignore_patterns=ignore_patterns
+            )
     
-    # Process GitHub repositories
+    # Process GitHub repositories using repomix --remote
     if 'github_repositories' in profile:
         for repo_info in profile['github_repositories']:
             repo_url = repo_info.get('url')
@@ -538,37 +594,27 @@ def main():
                 print_error(f"Could not parse repository name from URL: {repo_url}")
                 continue
 
-            # Create a dedicated temp folder for the clone
-            temp_base_path = os.path.join('temp', repo_name.replace('/', '_'))
-
-            # --- Start of new cleanup logic ---
-            def remove_readonly(func, path, _):
-                """Clear the readonly bit and re-attempt the removal"""
-                os.chmod(path, stat.S_IWRITE)
-                func(path)
-
-            if os.path.isdir(temp_base_path):
-                print_status(f"Temporary directory '{temp_base_path}' already exists. Cleaning up before clone.")
-                shutil.rmtree(temp_base_path, onerror=remove_readonly)
-            # --- End of new cleanup logic ---
+            # Extract compression and ignore patterns from repo config
+            compress = repo_info.get('compress', False)
+            ignore_patterns = repo_info.get('ignore_patterns', None)
             
-            try:
-                # 1. Clone repo and process with repomix
-                if clone_github_repo(repo_url, temp_base_path):
-                    process_repository_with_repomix(temp_base_path, output_dir, date_prefix)
+            # Use repomix --remote instead of manual cloning
+            process_repository_with_repomix(
+                repo_url, 
+                output_dir, 
+                date_prefix, 
+                compress=compress, 
+                remote=True, 
+                ignore_patterns=ignore_patterns
+            )
 
-                # 2. Fetch issues if requested
-                if repo_info.get('fetch_issues'):
-                    fetch_github_issues(repo_name, output_dir, date_prefix)
-                
-                # 3. Fetch PRs if requested
-                if repo_info.get('fetch_prs'):
-                    fetch_github_prs(repo_name, output_dir, date_prefix)
-            finally:
-                # Ensure the temporary directory is always removed
-                if os.path.isdir(temp_base_path):
-                    print_status(f"Cleaning up temporary directory: {temp_base_path}")
-                    shutil.rmtree(temp_base_path, onerror=remove_readonly)
+            # Fetch issues if requested
+            if repo_info.get('fetch_issues'):
+                fetch_github_issues(repo_name, output_dir, date_prefix)
+            
+            # Fetch PRs if requested
+            if repo_info.get('fetch_prs'):
+                fetch_github_prs(repo_name, output_dir, date_prefix)
 
     # --- FINAL MESSAGE ---
     end_time = datetime.now()
