@@ -1,4 +1,4 @@
-# v1.2 - Added repomix --compress and --remote support
+# v1.4 - Added repomix --compress and --remote support
 import os
 import json
 import configparser

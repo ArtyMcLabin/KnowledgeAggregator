@@ -1,4 +1,4 @@
-# v1.3 Knowledge Aggregator
+# v1.4 Knowledge Aggregator
 
 This tool is designed to be set up and used by a Large Language Model (LLM) assistant like the one in Cursor. Point your LLM to this README file and instruct it to follow the setup steps.
 
@@ -57,33 +57,69 @@ When a user asks you to create a profile or add a data source, follow this logic
 
 ### Example Profile (`projectsSources/my_startup.json`)
 
-A profile's `sources` object only needs to contain keys for the data sources it actually uses.
+A profile only needs to contain keys for the data sources it actually uses. You can omit any sections you don't need.
 
 ```json
 {
   "name": "My Awesome Startup",
   "output_dir": "knowledge_base_output/My_Awesome_Startup",
-  "sources": {
-    "trello_boards": [
+  "trello": {
+    "boards": [
       { "id": "your_trello_board_id" }
-    ],
-    "local_repositories": [
-      { "path": "C:/path/to/your/local/repo" }
-    ],
-    "github_repositories": [
-      {
-        "url": "https://github.com/owner/repo-name",
-        "fetch_issues": true,
-        "fetch_prs": true
-      }
-    ],
-  "google_sheets": [
-      { "id": "your_google_sheet_id" }
+    ]
+  },
+  "repositories": [
+    { 
+      "path": "C:/path/to/your/local/repo",
+      "compress": false,
+      "ignore_patterns": ["build/", "*.pyc"]
+    }
   ],
-    "supabase": {}
+  "github_repositories": [
+    {
+      "url": "https://github.com/owner/repo-name",
+      "fetch_issues": true,
+      "fetch_prs": true,
+      "compress": true,
+      "ignore_patterns": ["node_modules/", "*.log"]
+    }
+  ],
+  "google_sheets": [
+    { "id": "your_google_sheet_id" }
+  ],
+  "supabase": {
+    "url": "your_supabase_url",
+    "service_role_key": "your_service_role_key"
   }
 }
 ```
+
+### New Features (v1.4)
+
+#### Repository Compression
+You can now enable compression for repository processing by adding `"compress": true` to any repository configuration. This uses repomix's built-in compression to significantly reduce output file sizes:
+
+```json
+{
+  "url": "https://github.com/owner/repo-name",
+  "compress": true
+}
+```
+
+#### Remote Repository Processing
+GitHub repositories are now processed using `repomix --remote`, which eliminates the need for manual cloning and temporary directory management. This makes the process faster and more reliable.
+
+#### Custom Ignore Patterns
+You can specify custom ignore patterns directly in the profile JSON for any repository:
+
+```json
+{
+  "path": "/path/to/repo",
+  "ignore_patterns": ["node_modules/", "*.log", "build/", "dist/"]
+}
+```
+
+These patterns work in addition to any `.repomixignore` file in the target repository.
 
 ### Credentials Setup (As Needed)
 
