@@ -1,0 +1,21 @@
+---
+description:
+globs:
+alwaysApply: always
+---
+# Global Rule: Always Test After Editing
+
+❗❗❗❗❗❗ **CRITICAL WORKFLOW RULE** ❗❗❗❗❗❗
+
+After making **any** code modification, the following verification loop **must** be executed:
+
+1.  **Run the Script:** Execute the primary script or a relevant test case (e.g., a wrapper script) to validate the changes.
+2.  **Verify the Output:**
+    -   Check the terminal output for any errors or unexpected messages.
+    -   Inspect the generated files (e.g., in `knowledge_base_output/`) to confirm they match the expected outcome. This includes checking filenames, content, and that files are not empty unless expected.
+3.  **Iterate Until Success:**
+    -   If the run fails or the output is incorrect, **do not stop**.
+    -   Analyze the failure, propose a fix, and apply it.
+    -   Return to Step 1 and repeat the loop until the script runs successfully and the output is confirmed to be correct.
+
+This iterative "run, verify, fix" cycle is mandatory to ensure the project remains in a working state.
