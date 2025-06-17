@@ -1,26 +1,30 @@
 ---
-description:
-globs:
+description: anything git related
+globs: 
 alwaysApply: false
 ---
-# GitWorkflow
+This project uses GitWorkflow for all git operations.
 
-This project uses the GitWorkflow system as defined in https://github.com/ArtyMcLabin/GitWorkflow/README.md.
+1) Git Operations:
+   - ALWAYS use `.git_workflow/git_workflow.ps1` for ANY git operations
+   - NEVER use raw git commands unless explicitly approved by human
+   - If operation not supported by GitWorkflow:
+     a) STOP - do not use raw git commands
+     b) Report to user: "Human, operation X is not defined in GitWorkflow. Should we add it officially?"
+     c) Only proceed with raw git if explicitly approved
 
-## Branch Structure
+2) Repository Operations:
+   - Check for updates before operations: `.git_workflow/git_workflow.ps1`
+   - Follow security warnings if shown
+   - Use standard commit message format
+   - Always include issue references if applicable
 
-- `main` - The primary branch that contains production-ready code
-- `develop` - The development branch where features are integrated
-- `feature/*` - Feature branches for new functionality
-- `fix/*` - Branches for bug fixes
-- `hotfix/*` - Critical fixes that need to be applied directly to main
-
-## Workflow Rules
-
-1. Always create feature branches from `develop`
-2. Use descriptive branch names with prefixes (`feature/`, `fix/`, `hotfix/`)
-3. Rebase feature branches before merging to maintain a clean history
-4. Use `--no-ff` when merging to preserve feature branch history
-5. Delete branches after they are merged
-
-Follow all GitWorkflow procedures for this repository.
+3) Issue Management:
+   - Use GitWorkflow's issue creation system
+   - Follow standard labeling conventions
+   - Use proper issue templates
+   - Link commits to issues when resolving
+4) Security:
+   - Review security warnings during updates
+   - Never bypass security checks without user approval
+   - Report suspicious changes to repository owner
