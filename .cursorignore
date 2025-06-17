@@ -1,0 +1,2 @@
+# Override gitignore to allow Cursor access to .env file
+!.env 
