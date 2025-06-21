@@ -98,8 +98,16 @@ def get_google_creds():
     
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                print_status("Attempting to refresh expired Google token...")
+                creds.refresh(Request())
+                print_success("Google token refreshed successfully")
+            except Exception as e:
+                print_status(f"Token refresh failed: {str(e)}")
+                print_status("Starting new OAuth flow...")
+                creds = None  # Force new OAuth flow
+        
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
             creds = flow.run_local_server(port=0)
         
