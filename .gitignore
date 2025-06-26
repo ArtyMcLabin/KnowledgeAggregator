@@ -83,4 +83,11 @@ WRAPPERS/*
 
 # Ignore the contents of the temp directory
 temp/*
-!temp/.gitkeep 
+!temp/.gitkeep
+
+# Profiles
+/profiles/*.json
+/projectsSources/*.json
+
+# Env
+.env 

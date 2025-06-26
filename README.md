@@ -9,7 +9,7 @@ Knowledge Aggregator is a Python script that collects information from various s
 **Supported by default:**
 - Trello boards
 - Google Sheets
-- Supabase databases (schema dump)
+- PostgreSQL databases (schema dump)
 - Local Git repositories
 - GitHub repositories (cloning, issues, and pull requests)
 
@@ -87,11 +87,20 @@ A profile only needs to contain keys for the data sources it actually uses. You 
   "google_sheets": [
     { "id": "your_google_sheet_id" }
   ],
-  "supabase": {
-    "url": "your_supabase_url",
-    "service_role_key": "your_service_role_key"
-  }
+  "database_url": "postgresql://user:password@host:port/dbname?sslmode=require"
 }
+```
+
+### New Features (v1.5)
+
+#### Generic PostgreSQL Support
+The script now supports connecting to any standard PostgreSQL database, not just Supabase. To use it, add a `database_url` key to your profile with the standard PostgreSQL connection string. The Supabase-specific configuration is no longer needed.
+
+#### Command-Line Arguments
+- `--no-pause`: Add this flag to the run command to prevent the script from pausing for user input upon completion. This is useful for automated workflows.
+
+        ```bash
+python knowledge_aggregator.py --profile projectsSources/my_startup.json --no-pause
 ```
 
 ### New Features (v1.4)
@@ -136,10 +145,11 @@ These patterns work in addition to any `.repomixignore` file in the target repos
     3.  Download the client secrets JSON, place it in the `auth/` directory.
     4.  Update `GOOGLE_CLIENT_SECRETS_JSON` in your `.env` file to point to this file (e.g., `auth/your_credentials_file.json`).
 
+-   **For PostgreSQL**:
+    1.  Add the full `database_url` connection string to your project's JSON profile file.
+
 -   **For Supabase**:
-    1.  Navigate to your Supabase project's **Settings > API** and copy your `URL`. Add it to `.env` as `SUPABASE_URL`.
-    2.  From the same page, copy the `service_role` key. Add it to `.env` as `SUPABASE_SERVICE_KEY`.
-    3.  Navigate to **Settings > Database** and copy the `Connection string` URI. Add it to `.env` as `DB_URL`.
+    1.  This is now handled by the generic PostgreSQL connection. Please use the `database_url` from your Supabase project's **Settings > Database** page.
 
 ## How to Run
 

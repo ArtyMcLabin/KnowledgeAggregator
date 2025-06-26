@@ -399,116 +399,79 @@ def clone_github_repo(repo_url, temp_dir):
         print_error(f"Failed to clone repository '{repo_url}': {e.stderr}")
         return False
 
-def dump_supabase_schema(db_config, output_dir, date_prefix):
-    """Extracts the Supabase database schema using the Supabase REST API."""
-    print_status("Extracting Supabase DB schema...")
-
+def dump_postgres_schema(database_url, output_dir, date_prefix):
+    """Extracts a PostgreSQL database schema using a direct connection."""
+    print_status("Extracting PostgreSQL DB schema...")
+    
     try:
-        # Extract required fields from the config, as it was before
-        api_url = db_config.get('api_url')
-        service_role_key = db_config.get('service_role_key')
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        if not api_url or not service_role_key:
-            print_error("Supabase API URL or service role key not provided in the project profile's 'supabase' object.")
+        db_name = conn.get_dsn_parameters().get('dbname', 'postgres')
+        output_path = os.path.join(output_dir, f"{date_prefix}_postgres_schema_{db_name}.json")
 
-        # Create a Supabase client
-        supabase: Client = create_client(api_url, service_role_key)
-        
-        # Define the output path for the schema
-        output_path = os.path.join(output_dir, f"{date_prefix}_supabase_schema_{api_url.replace('https://', '').replace('.', '_')}.json")
-        
-        # Dictionary to store schema information
         schema_data = {
             "metadata": {
                 "exported_at": datetime.now().isoformat(),
-                "api_url": api_url
+                "db_name": db_name
             },
             "schemas": {},
-            "tables": {},
-            "functions": {},
-            "extensions": []
+            "tables": {}
         }
-        
-        # Fetch database schema information using RPC
-        try:
-            # Get all tables
-            response = supabase.table("pg_tables").select("*").execute()
-            tables_data = response.data
-            
-            for table in tables_data:
-                schema_name = table.get("schemaname")
-                table_name = table.get("tablename")
-                
-                # Skip system schemas
-                if schema_name in ['pg_catalog', 'information_schema', 'extensions', 
-                                  'graphql', 'graphql_public', 'pgbouncer', 
-                                  'realtime', 'storage']:
-                    continue
-                
-                # Add schema if not already in our data
-                if schema_name not in schema_data["schemas"]:
-                    schema_data["schemas"][schema_name] = {
-                        "name": schema_name,
-                        "tables": []
-                    }
-                
-                # Add table to schema's tables list
-                if table_name not in schema_data["schemas"][schema_name]["tables"]:
-                    schema_data["schemas"][schema_name]["tables"].append(table_name)
-                
-                # Get table columns
+
+        # Get all schemas and the tables within them
+        cur.execute("""
+            SELECT schema_name
+            FROM information_schema.schemata
+            WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+              AND schema_name NOT LIKE 'pg_temp_%' AND schema_name NOT LIKE 'pg_toast_temp_%';
+        """)
+        schemas = cur.fetchall()
+
+        for schema in schemas:
+            schema_name = schema['schema_name']
+            schema_data["schemas"][schema_name] = {"name": schema_name, "tables": []}
+
+            # Get all tables for the current schema
+            cur.execute("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = %s;
+            """, (schema_name,))
+            tables = cur.fetchall()
+
+            for table in tables:
+                table_name = table['table_name']
                 table_key = f"{schema_name}.{table_name}"
+                schema_data["schemas"][schema_name]["tables"].append(table_name)
+                
+                # Get all columns for the current table
+                cur.execute("""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = %s AND table_name = %s
+                    ORDER BY ordinal_position;
+                """, (schema_name, table_name))
+                columns = cur.fetchall()
+                
                 schema_data["tables"][table_key] = {
                     "name": table_name,
                     "schema": schema_name,
-                    "columns": []
+                    "columns": [dict(col) for col in columns]
                 }
-                
-                # Fetch columns for this table using RPC
-                try:
-                    # We'll use a direct REST API call since the Supabase Python client
-                    # doesn't have built-in methods for schema introspection
-                    headers = {
-                        "apikey": service_role_key,
-                        "Authorization": f"Bearer {service_role_key}",
-                        "Content-Type": "application/json"
-                    }
-                    
-                    # Call RPC to get columns
-                    rpc_payload = {
-                        "schema": schema_name,
-                        "table": table_name
-                    }
-                    
-                    rpc_url = f"{api_url}/rest/v1/rpc/get_columns"
-                    columns_response = requests.post(
-                        rpc_url,
-                        headers=headers,
-                        json=rpc_payload
-                    )
-                    
-                    if columns_response.status_code == 200:
-                        columns = columns_response.json()
-                        schema_data["tables"][table_key]["columns"] = columns
-                    else:
-                        print_status(f"Could not fetch columns for {table_key}. Using fallback method.")
-                        # Fallback: Just record the table name without column details
-                        pass
-                        
-                except Exception as e:
-                    print_status(f"Error fetching columns for {table_key}: {e}")
-            
-        except Exception as e:
-            print_status(f"Error fetching tables: {e}")
         
-        # Write the schema data to file
+        cur.close()
+        conn.close()
+
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(schema_data, f, indent=2)
+            json.dump(schema_data, f, indent=2, default=str) # Use default=str to handle complex data types
         
-        print_success(f"Supabase schema information saved to {output_path}")
-        
+        print_success(f"PostgreSQL schema saved to {output_path}")
+
+    except psycopg2.Error as e:
+        print_error(f"Database connection or query failed: {e}")
     except Exception as e:
-        print_error(f"Failed to extract Supabase schema: {e}")
+        print_error(f"An unexpected error occurred during PostgreSQL schema dump: {e}")
 
 def load_profile(profile_path):
     """Loads a JSON profile file."""
@@ -528,6 +491,7 @@ def main():
     """Main function to run the knowledge aggregator."""
     parser = argparse.ArgumentParser(description="Knowledge Aggregator for LLMs")
     parser.add_argument('--profile', type=str, required=True, help='Path to the project profile JSON file.')
+    parser.add_argument('--no-pause', action='store_true', help='Do not pause for user input at the end of the script.')
     args = parser.parse_args()
 
     # Load the specified profile
@@ -570,8 +534,10 @@ def main():
         for sheet in profile['google_sheets']:
             fetch_google_sheet(sheet.get("id"), google_creds, output_dir, date_prefix)
     
-    if 'supabase' in profile:
-        dump_supabase_schema(profile['supabase'], output_dir, date_prefix)
+    # --- Database Processing ---
+    # Prioritize standard PostgreSQL connection if available
+    if 'database_url' in profile:
+        dump_postgres_schema(profile['database_url'], output_dir, date_prefix)
 
     # Process local repositories
     if 'repositories' in profile:
@@ -640,6 +606,11 @@ def main():
             subprocess.run(["xdg-open", os.path.realpath(output_dir)])
     except Exception as e:
         print_error(f"Could not open output directory '{output_dir}'. Please open it manually. Error: {e}")
+
+    # Final pause unless disabled
+    if not args.no_pause:
+        print("\nPress Enter to exit...")
+        input()
 
 
 if __name__ == '__main__':
